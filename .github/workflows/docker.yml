@@ -1,0 +1,83 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/docker
+        key: ${{ runner.os }}-docker-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-docker-
+
+    - name: Build Docker image
+      run: docker build . -t my-app:latest
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Tag Docker image
+      run: docker tag my-app:latest ${{ secrets.DOCKER_USERNAME }}/my-app:latest
+
+    - name: Push Docker image
+      run: docker push ${{ secrets.DOCKER_USERNAME }}/my-app:latest
+
+    - name: Logout from Docker Hub
+      run: docker logout
+
+  terraform:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.4.0
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+    
+    - name: Terraform Init
+      run: terraform init
+
+    
+    - name: Terraform Plan
+      env:
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        DB_USERNAME: ${{ secrets.DB_USERNAME }}
+        docker_image: ${{ secrets.DOCKER_USERNAME }}/my-app
+      run: terraform plan -var="DB_PASSWORD=${DB_PASSWORD}" -var="DB_USERNAME=${DB_USERNAME}" -var="docker_image=${DOCKER_USERNAME}/my-app"
+    
+    - name: Terraform Apply
+      env:
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        DB_USERNAME: ${{ secrets.DB_USERNAME }}
+      run: terraform apply -auto-approve -var="DB_PASSWORD=${DB_PASSWORD}" -var="DB_USERNAME=${DB_USERNAME}" -var="docker_image=${DOCKER_USERNAME}/my-app"
+     
+    - name: Terraform destroy
+      run: terraform destroy -auto-approve -var="DB_PASSWORD=${DB_PASSWORD}" -var="DB_USERNAME=${DB_USERNAME}" -var="docker_image=${DOCKER_USERNAME}/my-app"
+      
