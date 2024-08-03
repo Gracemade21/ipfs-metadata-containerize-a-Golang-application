@@ -80,4 +80,4 @@ jobs:
      
     - name: Terraform destroy
       run: terraform destroy -auto-approve -var="DB_PASSWORD=${DB_PASSWORD}" -var="DB_USERNAME=${DB_USERNAME}" -var="docker_image=${DOCKER_USERNAME}/my-app"
-      
+    
